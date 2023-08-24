@@ -30,9 +30,9 @@ rerun-incomplete: True
 printshellcmds: True
 scheduler: greedy
 use-conda: True
-conda-prefix: /home/baumlerc/miniconda3
+conda-prefix: /home/<Change to your home directory>/miniconda3
 conda-frontend: mamba
 cluster-status: ~/.config/snakemake/slurm/slurm-status.py
-shadow-prefix: /group/ctbrowngrp/scratch/baumlerc/snakemake-slurm
+shadow-prefix: /group/ctbrowngrp/scratch/<Change to your home directory>/snakemake-slurm
 cluster-cancel: scancel
 cluster-cancel-nargs: 1000
