@@ -1,3 +1,4 @@
+# Create log file and sbatch jobs per rule
 cluster:
   mkdir -p logs/{rule}/ &&
   sbatch
@@ -12,12 +13,14 @@ cluster:
     --partition={resources.partition}
     --parsable
 
+# The default resources per rule (overright by defining a `resources:` section in a rule)
 default-resources:
   - mem_mb=2000
   - time=240
   - partition=low2
   - nodes=1
 
+# Snakemake cli options
 cores: 64
 jobs: 100
 latency-wait: 60
