@@ -16,14 +16,14 @@ default-resources:
   - mem_mb=2000
   - time=240
   - partition=low2
-  - threads=1
   - nodes=1
 
+cores: 64
 jobs: 100
 latency-wait: 60
-local-cores: 1
 restart-times: 5
 max-jobs-per-second: 100
+local-cores: 1
 max-status-checks-per-second: 20
 keep-going: True
 rerun-incomplete: True
