@@ -8,8 +8,8 @@ cluster:
     --job-name=smk-{rule}
     --ntasks={resources.nodes}
     --nodes={resources.nodes}
-    --output=logs/{rule}/{jobid}.out
-    --error=logs/{rule}/{jobid}.err
+    --output=logs/{rule}/{jobid}.{resources.attempt_cnt}.out
+    --error=logs/{rule}/{jobid}.{resources.attempt_cnt}.err
     --partition={resources.partition}
     --parsable
 
@@ -19,6 +19,7 @@ default-resources:
   - time=240
   - partition=low2
   - nodes=1
+  - attempt_cnt=attempt
 
 # Snakemake cli options
 cores: 64
