@@ -14,7 +14,12 @@ A script called by `config.yaml` for better cluster performance. See https://sna
 
 Snakemake files for creating retrieving, sketching, gathering, and parsing data commonly used in the Data Intensive Biology lab at the University of California, Davis. 
 
-## download-sketch
+There is a directory housing the configuration and environment files called by the workflow. In addition, the metadata directory contains an example dataset of the [CAMI](https://www.microbiome-cosi.org/) 
+
+## Sourmash workflows
+
+### 1. download-sketch
 A set of fast, robust approaches to temporarily downloading sequence files from archives and sketch sourmash signatures.
 
-## prefetch
+### 2. extract-prefetch
+An efficient approach to temporarily extract the sketches in sourmash signatures that are passed into a prefetch method for `sourmash gather` results via `picklists`.
