@@ -1,0 +1,84 @@
+####
+# This snakefile was created to download,
+# sketch, and remove unnecessary files
+# within a HPC environment and the slurm
+# scheduler. View dotfiles for more
+# information.
+#
+# Example cli:
+# snakemake -s download-sketch-cluster --resources allowed_jobs=100 --profile slurm
+#
+# Note: Change <USRNAME> on line 71!!!
+####
+
+import pandas as pd
+
+from os.path import exists
+
+configfile: "config/download-sketch-config.yaml"
+
+# Create a list of runs for each project
+metadata = pd.read_csv(config['metadata_file_path'], usecols=['Run'])
+
+SAMPLES = metadata['Run'].tolist()
+
+# Dictionary for dynamic slurm batch allocations with correct resources
+PART_JOBS = {1: ['low2', 1], 2: ['low2', 1], 3: ['med2', 33], 4: ['med2', 33], 5: ['high2', 10000]}
+
+rule all:
+    input:
+         expand("sigs/{sample}.sig.gz", sample=SAMPLES),
+
+# Subset the DAG by existing sig files
+if not exists("sigs/{wildcards.sample}.sig.gz"):
+    rule download_sra_to_sketch:
+        output:
+            temp("sra/{sample}.sra")
+        threads:
+            10
+        resources:
+            mem_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
+            #time = lambda wildcards, attempt: 4 * 60 * attempt,
+            #runtime = lambda wildcards, attempt: 4 * 60 * attempt,
+            allowed_jobs=25, # Allow only four jobs at a time
+            partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+        conda:
+            "envs/download-sketch-env.yaml"
+        shell:
+           """
+               aws s3 cp --quiet --no-sign-request \
+               s3://sra-pub-run-odp/sra/{wildcards.sample}/{wildcards.sample} \
+               sra/{wildcards.sample}.sra \
+               || prefetch --quiet {wildcards.sample} -o sra/{wildcards.sample}.sra
+           """
+
+rule dump_and_sketch:
+    threads: 16
+    resources:
+        mem_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    input:
+        sra_file = "sra/{sample}.sra"
+    output:
+        "sigs/{sample}.sig.gz",
+    conda:
+        "envs/download-sketch-env.yaml"
+    shell:
+        """
+        # make a directory specific to user and job
+        export MYTMP="/scratch/<USRNAME>/slurm_{rule}.{jobid}"
+        mkdir -p "$MYTMP"
+
+        # force clean it up after job script ends
+        function cleanup()(rm -rf "$MYTMP")
+        trap cleanup EXIT
+
+        # Get fastqc file
+        fasterq-dump --stdout --skip-technical --fasta-unsorted\
+        --threads {threads} --bufsize 1000MB --curcache 10000MB --mem {resources.mem_mb} \
+        {input.sra_file} | \
+        sourmash sketch dna -p scaled=1000,k=21,k=31,k=51,abund - -o {output}
+        """
