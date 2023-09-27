@@ -1,0 +1,14 @@
+channels:
+ - conda-forge
+ - bioconda
+ - defaults
+dependencies:
+ - python>=3.8,<3.10
+ - sourmash>=4.8.0,<5
+ - rust
+ - gcc_linux-64
+ - gxx_linux-64
+ - pip
+ - pip:
+   - sourmash-mixers
+   - git+https://github.com/sourmash-bio/pyo3_branchwater.git#egg=pyo3_branchwater

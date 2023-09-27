@@ -9,7 +9,7 @@ run_ids = metadata['Run'].tolist()
 
 rule all:
     input:
-        expand("sigs_1k/{run_id}.sig", run_id=run_ids),
+        expand("sigs/{run_id}.sig", run_id=run_ids),
 
 rule download_sra:
     output:
@@ -20,7 +20,7 @@ rule download_sra:
         "env.yaml"
     shell:
         """
-        if [ ! -f "sigs_1k/{wildcards.run_id}.sig" ] && [ ! -f "sra/{wildcards.run_id}.sra" ]; then
+        if [ ! -f "sigs/{wildcards.run_id}.sig" ] && [ ! -f "sra/{wildcards.run_id}.sra" ]; then
             aws s3 cp --quiet --no-sign-request s3://sra-pub-run-odp/sra/{wildcards.run_id}/{wildcards.run_id} sra/{wildcards.run_id}.sra
         fi
         """
@@ -35,7 +35,7 @@ rule dump_and_sketch_sourmash_1k:
     input:
         sra_file = "sra/{run_id}.sra"
     output:
-        "sigs_1k/{run_id}.sig"
+        "sigs/{run_id}.sig"
     log:
         "logs/sourmash/{run_id}.log"
     params:

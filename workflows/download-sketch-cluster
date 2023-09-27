@@ -66,8 +66,7 @@ rule dump_and_sketch:
         "sigs/{sample}.sig.gz",
     conda:
         "envs/download-sketch-env.yaml"
-    shell:
-        """
+    shell:"""
         # make a directory specific to user and job
         export MYTMP="/scratch/<USRNAME>/slurm_{rule}.{jobid}"
         mkdir -p "$MYTMP"
@@ -81,4 +80,4 @@ rule dump_and_sketch:
         --threads {threads} --bufsize 1000MB --curcache 10000MB --mem {resources.mem_mb} \
         {input.sra_file} | \
         sourmash sketch dna -p scaled=1000,k=21,k=31,k=51,abund - -o {output}
-        """
+    """

@@ -1,0 +1,12 @@
+input_dir: sigs
+
+databases_dir: dbs
+
+output_dir: gather/prefetch
+
+metadata_file_path: metadata/SraRunTable.txt
+
+k_size:
+  - 21
+  - 31
+  - 51

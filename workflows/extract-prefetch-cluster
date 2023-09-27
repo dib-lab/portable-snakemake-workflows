@@ -1,0 +1,83 @@
+####
+# This file is set to use the following command line argument
+# `snakemake -s gather --resources allowed_jobs=100 --profile slurm`
+# This profile will run 100 jobs max at one time. IF the rule's resource
+# section is assigned an allowed_jobs value only the value divided by 100
+# jobs will run concurrently (i.e. allowed_jobs = 25 will run
+# only 4 concurrent slurm jobs).
+#
+# For those rules that do include allowed_jobs with a lambda function in
+# the resources section they will run 100 job in the low partition,
+# 3 jobs in the medium, and only 1 job on the high partition.
+####
+
+import pandas as pd
+import os
+
+print("Current working directory: " + os.getcwd())
+homedir = os.getcwd()
+
+configfile: 'config/extract-prefetch-config.yaml'
+
+indir = config.get("input_dir")
+outdir = config.get("output_dir")
+dbdir = config.get("databases_dir")
+
+DBLIST = [ x for x in os.listdir(dbdir) if x.endswith(".fullpath.txt") ]
+print("Using these database lists: ", DBLIST)
+
+SIGS, = glob_wildcards(f'{indir}/{{acc}}.sig.gz')
+
+metadata = pd.read_csv(config['metadata_file_path'], usecols=['Run', 'BioProject'])
+SAMPLES = metadata['Run'].tolist()
+
+PART_JOBS = {1: ['low2', 1], 2: ['low2', 1], 3: ['med2', 33], 4: ['med2', 33], 5: ['high2', 10000]}
+
+rule all:
+    input:
+       expand(f"{outdir}/{{acc}}.k{{k}}.fastgather.csv", acc=SAMPLES, k=config["k_size"]),
+
+rule extract:
+    input:
+        f'{indir}/{{acc}}.sig.gz',
+    output:
+        temp(f'{indir}/{{acc}}.k{{k}}.sig.gz'),
+    conda:
+        'envs/extract-prefetch-env.yaml'
+    shell:"""
+        sourmash sig extract {input} -k {wildcards.k} --dna -o {output}
+    """
+
+rule fastgather:
+    input:
+        sig=f'{indir}/{{acc}}.k{{k}}.sig.gz',
+        list=f'{dbdir}/gtdb-reps-rs214-k{{k}}.fullpath.txt'
+    output:
+        csv=touch(f"{outdir}/{{acc}}.k{{k}}.fastgather.csv"),
+    conda:
+        'envs/extract-prefetch-env.yaml'
+    threads:
+        32
+    resources:
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    shell: """
+        # make a directory specific to user and job
+        export MYTMP="/scratch/<USRNAME>/slurm_{rule}.{jobid}"
+        mkdir -p "$MYTMP"
+
+        # force clean it up after job script ends
+        function cleanup()(rm -rf "$MYTMP")
+        trap cleanup EXIT
+
+        # You're moving! Tell me where you are?!?!
+        cd $MYTMP
+        echo running in $(pwd)
+
+        # Get prefetch csv
+        export RAYON_THREADS={threads}
+        sourmash scripts fastgather {homedir}/{input.sig} {homedir}/{input.list} \
+            -o {homedir}/{output.csv} -k {wildcards.k} --scaled 1000
+
+        echo Final file path: {homedir}/{output.csv}
+    """
