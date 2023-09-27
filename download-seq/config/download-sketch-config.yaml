@@ -1,1 +1,4 @@
-
+# This is the file path to the metadata file.
+# In this case, the file is the fulle metadata
+# output of the SRA Run Selector.
+metadata_file_path: ./metadata/SraRunTable.txt
