@@ -14,7 +14,7 @@ A script called by `config.yaml` for better cluster performance. See https://sna
 
 Snakemake files for creating retrieving, sketching, gathering, and parsing data commonly used in the Data Intensive Biology lab at the University of California, Davis. 
 
-There is a directory housing the configuration and environment files called by the workflow. In addition, the metadata directory contains an example dataset of the [CAMI](https://www.microbiome-cosi.org/) 
+There is a directory housing the configuration and environment files called by the workflow. In addition, the metadata directory contains a `SraRunTable.txt` file for an example dataset from [CAMI](https://www.microbiome-cosi.org/). 
 
 ## Sourmash workflows
 
