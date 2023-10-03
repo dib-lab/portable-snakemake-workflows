@@ -3,7 +3,7 @@ dirpath: dbs
 
 # The sketch databases to convert filename
 database:
-  - db.plastid.2.1.sig.gz
+  - plastid.3.1.genomic.sig.gz
 
 # The k values within the database (`sourmash sig fileinfo`)
 k-size:

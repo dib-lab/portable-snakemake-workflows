@@ -46,5 +46,13 @@ optional arguments:
 ```
 
 TODO:
-1. how to convert a set of sequence files to smash database in first place.
-2. create example dataset
+1. create example dataset using `sourmash sketch fromfile` to run the workflow 
+  - using a set of fasta genomes currently from [refseq plastid](https://ftp.ncbi.nih.gov/refseq/release/plastid/) 
+2. combine into single cmd with ( && )
+  - `mkdir dbs`
+  - `cd dbs`
+  - `wget -c ftp://ftp.ncbi.nih.gov/refseq/release/plastid/plastid.3.1.genomic.fna.gz -o plastid.3.1.genomic.fna.gz`
+  - `sourmash sketch dna -p scaled=100,k=21,k=31,k=51 -p scaled=1000,k=21,k=31,k=51 --singleton plastid.3.1.genomic.fna.gz -o plastid.3.1.genomic.sig.gz`
+  - ...
+  - `cd ..`
+  - `snakemake -s sbt-lca-databases -j?`
