@@ -1,0 +1,76 @@
+import os
+
+configfile: "config/sbt-lca-databases.yaml"
+
+print(config.get("database"))
+print(config["database"][0])
+
+db_name = config["database"]
+db_file = lambda wildcards: config["database"][wildcards.db_name]
+print((db_file),)
+
+dir = config.get("dirpath")
+#database_dir = [os.path.join(config.get("dir_path"), config.get("database"))]
+
+# Run entire workflow without defining a rule
+rule all:
+    input:
+        expand("{dir}/{db}.k{k}.lca.json", dir=config["dirpath"], db=config["database"], k=config["k-size"])
+
+# Create an index from existing sourmash database
+rule sbt_me:
+    input: "{db}"
+    output: "{dir}/{db}.k{k}.gz"
+    conda:
+        "sbt-lca-databases-env.yaml"
+    shell:"""
+        sourmash index {output} {input} -k {wildcards.k}
+    """
+
+# Get the accessions from the "names" of signatures in sourmash SBT databsae
+rule excerpt_accessions:
+    input: "{dir}/{db}.k{k}.gz"
+    output: "{dir}/{db}.k{k}.acc"
+    conda:
+        "sbt-lca-databases-env.yaml"
+    shell:"""
+        ./get-accessions-from-sbt.py {input} -o {output}
+    """
+
+# Map accession to taxid
+rule x_marks_taxid:
+    input: "{dir}/{db}.k{k}.acc"
+    output: "{dir}/{db}.k{k}.acc.taxid"
+    shell:"""
+        ./make-acc-taxid-mapping.py {input} nucl_gb.accession2taxid.gz
+    """
+
+# Gather lineages into a single csv file
+rule linear_lineages:
+    input: "{dir}/{db}.k{k}.acc.taxid"
+    output: "{dir}/{db}.k{k}.lineages.csv"
+    conda:
+        "sbt-lca-databases-env.yaml"
+    shell:"""
+        ./make-lineage-csv.py nodes.dmp names.dmp {input} -o {output}
+    """
+
+# Clean the lineage file of the taxid
+rule scrub_a_dub:
+    input: "{dir}/{db}.k{k}.lineages.csv"
+    output: "{dir}/{db}.k{k}.lca.lineages.csv"
+    shell:"""
+        cut -d ',' -f 1,3- < {input} > {output}
+    """
+# Create LCA sourmash index
+rule lca_me:
+    input:
+        sig = "{dir}/{db}.k{k}.sig.gz"
+        csv = "{dir}/{db}.k{k}.lca.lineages.csv"
+    output:
+        "{dir}/{db}.k{k}.lca.json"
+    conda:
+        "sbt-lca-databases-env.yaml"
+    shell:"""
+       sourmash lca index {input.csv} {output} {input.sig} --split-identifiers
+    """

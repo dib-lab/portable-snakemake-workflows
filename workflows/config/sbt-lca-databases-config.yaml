@@ -1,0 +1,16 @@
+# The relative path to the fasta file/s directory
+dirpath: seqs
+
+# The database name and filename
+database:
+  - db.plastid.2.1.sig.gz
+
+# The k values within the database (`sourmash sig fileinfo`)
+k-size:
+  - 21
+  - 31
+  - 51
+
+scale:
+  - 100
+  - 1000

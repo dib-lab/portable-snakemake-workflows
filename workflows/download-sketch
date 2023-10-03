@@ -17,7 +17,7 @@ rule download_sra:
     log:
         "logs/prefetch/{run_id}.log"
     conda:
-        "env.yaml"
+        "download-sketch-env.yaml"
     shell:
         """
         if [ ! -f "sigs/{wildcards.run_id}.sig" ] && [ ! -f "sra/{wildcards.run_id}.sra" ]; then
@@ -41,7 +41,7 @@ rule dump_and_sketch_sourmash_1k:
     params:
         sra_dir = "sra/{run_id}"
     conda:
-        "env.yaml"
+        "download-sketch-env.yaml"
     shell:
         """
         fasterq-dump --stdout --skip-technical \
