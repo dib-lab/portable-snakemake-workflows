@@ -28,3 +28,23 @@ An efficient approach to temporarily extract the sketches in sourmash signatures
 **[WIP]** A workflow to take any existing sourmash database and create a Sequence Bloom Tree (SBT) index and Lowest Common Ancestor (LCA) database.
 
 This was curated using existing scripts from the repo -> https://github.com/dib-lab/2018-ncbi-lineages
+
+An additional script, `find-rank-kmers.py` was included to extract the rank-specific kmers from an LCA database.
+```
+usage: find-rank-kmers.py [-h] -o OUTPUT [-s SAVE_NAMES] lca_db keep_rank
+
+positional arguments:
+  lca_db
+  keep_rank             Keep the rank specified (i.e. Species)
+
+optional arguments:
+  -h, --help            show this help message and exit
+  -o OUTPUT, --output OUTPUT
+                        output signature containing rank-specific hash values
+  -s SAVE_NAMES, --save-names SAVE_NAMES
+                        save list of matching signature names from that lineage to this file
+```
+
+TODO:
+1. how to convert a set of sequence files to smash database in first place.
+2. create example dataset

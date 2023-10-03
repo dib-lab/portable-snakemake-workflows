@@ -1,7 +1,7 @@
-# The relative path to the fasta file/s directory
-dirpath: seqs
+# The relative path to the directory of sketch databases 
+dirpath: dbs
 
-# The databases to convert filename
+# The sketch databases to convert filename
 database:
   - db.plastid.2.1.sig.gz
 

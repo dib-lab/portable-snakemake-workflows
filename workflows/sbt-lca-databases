@@ -17,10 +17,10 @@ rule all:
     input:
         expand("{dir}/{db}.k{k}.lca.json", dir=config["dirpath"], db=config["database"], k=config["k-size"])
 
-# Create an index from existing sourmash database
+# Create an index from existing sourmash database of signatures
 rule sbt_me:
-    input: "{db}"
-    output: "{dir}/{db}.k{k}.gz"
+    input: "{dir}/{db}"
+    output: "{dir}/{db}.k{k}.sbt.zip"
     conda:
         "sbt-lca-databases-env.yaml"
     shell:"""
@@ -29,7 +29,7 @@ rule sbt_me:
 
 # Get the accessions from the "names" of signatures in sourmash SBT databsae
 rule excerpt_accessions:
-    input: "{dir}/{db}.k{k}.gz"
+    input: "{dir}/{db}.k{k}.sbt.zip"
     output: "{dir}/{db}.k{k}.acc"
     conda:
         "sbt-lca-databases-env.yaml"
@@ -56,7 +56,7 @@ rule linear_lineages:
     """
 
 # Clean the lineage file of the taxid
-rule scrub_a_dub:
+rule scrub_a_dub_dub_lets_get drunk_in_a_tub:
     input: "{dir}/{db}.k{k}.lineages.csv"
     output: "{dir}/{db}.k{k}.lca.lineages.csv"
     shell:"""
