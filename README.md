@@ -23,3 +23,8 @@ A set of fast, robust approaches to temporarily downloading sequence files from 
 
 ### 2. extract-prefetch
 An efficient approach to temporarily extract the sketches in sourmash signatures that are passed into a prefetch method for `sourmash gather` results via `picklists`.
+
+### 3. sbt-lca-databases
+**[WIP]** A workflow to take any existing sourmash database and create a Sequence Bloom Tree (SBT) index and Lowest Common Ancestor (LCA) database.
+
+This was curated using existing scripts from the repo -> https://github.com/dib-lab/2018-ncbi-lineages
