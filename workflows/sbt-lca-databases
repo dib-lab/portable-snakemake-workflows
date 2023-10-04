@@ -1,6 +1,6 @@
 import os
 
-configfile: "config/sbt-lca-databases.yaml"
+configfile: "config/sbt-lca-databases-config.yaml"
 
 print(config.get("database"))
 print(config["database"][0])
@@ -58,15 +58,15 @@ rule linear_lineages:
 # Clean the lineage file of the taxid
 rule scrub_a_dub_dub_lets_get drunk_in_a_tub:
     input: "{dir}/{db}.k{k}.lineages.csv"
-    output: "{dir}/{db}.k{k}.lca.lineages.csv"
+    output: "{dir}/{db}.k{k}.lineages.lca.csv"
     shell:"""
         cut -d ',' -f 1,3- < {input} > {output}
     """
 # Create LCA sourmash index
 rule lca_me:
     input:
-        sig = "{dir}/{db}.k{k}.sig.gz"
-        csv = "{dir}/{db}.k{k}.lca.lineages.csv"
+        sig = "{dir}/{db}.k{k}.sig.gz",
+        csv = "{dir}/{db}.k{k}.lineages.lca.csv",
     output:
         "{dir}/{db}.k{k}.lca.json"
     conda:
