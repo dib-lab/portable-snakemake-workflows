@@ -26,7 +26,7 @@ dbdir = config.get("databases_dir")
 DBLIST = [ x for x in os.listdir(dbdir) if x.endswith(".fullpath.txt") ]
 print("Using these database lists: ", DBLIST)
 
-SIGS, = glob_wildcards(f'{indir}/{{acc}}.sig.gz')
+SIGS, = glob_wildcards(f'{indir}/{{acc}}.sig.zip')
 
 metadata = pd.read_csv(config['metadata_file_path'], usecols=['Run', 'BioProject'])
 SAMPLES = metadata['Run'].tolist()
@@ -39,9 +39,9 @@ rule all:
 
 rule extract:
     input:
-        f'{indir}/{{acc}}.sig.gz',
+        f'{indir}/{{acc}}.sig.zip',
     output:
-        temp(f'{indir}/{{acc}}.k{{k}}.sig.gz'),
+        temp(f'{indir}/{{acc}}.k{{k}}.sig.zip'),
     conda:
         'envs/extract-prefetch-env.yaml'
     shell:"""
@@ -50,7 +50,7 @@ rule extract:
 
 rule fastgather:
     input:
-        sig=f'{indir}/{{acc}}.k{{k}}.sig.gz',
+        sig=f'{indir}/{{acc}}.k{{k}}.sig.zip',
         list=f'{dbdir}/gtdb-reps-rs214-k{{k}}.fullpath.txt'
     output:
         csv=touch(f"{outdir}/{{acc}}.k{{k}}.fastgather.csv"),

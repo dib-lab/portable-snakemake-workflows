@@ -27,10 +27,10 @@ PART_JOBS = {1: ['low2', 1], 2: ['low2', 1], 3: ['med2', 33], 4: ['med2', 33], 5
 
 rule all:
     input:
-         expand("sigs/{sample}.sig.gz", sample=SAMPLES),
+         expand("sigs/{sample}.sig.zip", sample=SAMPLES),
 
 # Subset the DAG by existing sig files
-if not exists("sigs/{wildcards.sample}.sig.gz"):
+if not exists("sigs/{wildcards.sample}.sig.zip"):
     rule download_sra_to_sketch:
         output:
             temp("sra/{sample}.sra")
@@ -63,7 +63,7 @@ rule dump_and_sketch:
     input:
         sra_file = "sra/{sample}.sra"
     output:
-        "sigs/{sample}.sig.gz",
+        "sigs/{sample}.sig.zip",
     conda:
         "envs/download-sketch-env.yaml"
     shell:"""
