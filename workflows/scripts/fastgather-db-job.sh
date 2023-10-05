@@ -29,4 +29,4 @@ mkdir "gtdb-rs214-reps-k$k/"
 cd "gtdb-rs214-reps-k$k/"
 sourmash sig split -k $k /group/ctbrowngrp/sourmash-db/gtdb-rs214/gtdb-rs214-reps.k$k.zip -E .sig.zip
 cd ..
-find "gtdb-rs214-reps-k$k/" -name "*.sig.gz" -type f > "list.gtdb-rs214-reps-k$k.txt"
+find "gtdb-rs214-reps-k$k/" -name "*.sig.zip" -type f > "list.gtdb-rs214-reps-k$k.txt"
