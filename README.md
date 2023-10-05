@@ -36,7 +36,7 @@ Consider using the command below immediately after `git clone` to correctly plac
 
 The following portable workflows will run sequentially.
 
-### 1. download-sketch
+### 1a. download-sketch
 A set of fast, robust approaches to temporarily downloading sequence files from archives and sketch sourmash signatures.
 
 #### Quickstart:
@@ -47,7 +47,7 @@ snakemake -s download-sketch-cluster --resources allowed_jobs=100 --profile slur
 
 This will download and sketch the CAMI dataset into the `sigs` directory at scale of 1000 and kmer size of 21, 31, and 51. These values are set in the `download-sketch-config.yaml` and may be changed there at any time. 
 
-### 2. extract-prefetch
+### 2a. extract-prefetch
 An efficient approach to temporarily extract the sketches in sourmash signatures that are passed into the 'preferred' prefetch method. Creating a `picklist` for rapid `sourmash gather` results.
 
 #### Quickstart:
@@ -60,7 +60,7 @@ snakemake -s extract-prefetch-cluster --resources allowed_jobs=100 --profile slu
 
 This will temporarily extract all k-sizes and create a `prefetch` csv file of the CAMI sketches in the `gather/prefetch` directory for the scale and k value set in the `extract-prefetch-config.yaml`. 
 
-### 3. sbt-lca-databases
+### 1b. sbt-lca-databases
 **[WIP]** A workflow to take any existing sourmash database and create a Sequence Bloom Tree (SBT) index and Lowest Common Ancestor (LCA) database.
 
 This was curated using existing scripts from the repo -> https://github.com/dib-lab/2018-ncbi-lineages
