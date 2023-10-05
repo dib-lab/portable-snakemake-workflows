@@ -9,6 +9,10 @@
 # For those rules that do include allowed_jobs with a lambda function in
 # the resources section they will run 100 job in the low partition,
 # 3 jobs in the medium, and only 1 job on the high partition.
+#
+# Example cli:
+# snakemake -s extract-prefetch-cluster --resources allowed_jobs=100 --profile slurm
+#
 ####
 
 import pandas as pd
@@ -23,8 +27,10 @@ indir = config.get("input_dir")
 outdir = config.get("output_dir")
 dbdir = config.get("databases_dir")
 
-DBLIST = [ x for x in os.listdir(dbdir) if x.endswith(".fullpath.txt") ]
+DBLIST = [ x for x in os.listdir(dbdir) if x.startswith("fullpath.") ]
 print("Using these database lists: ", DBLIST)
+
+USER = os.environ.get('USER')
 
 SIGS, = glob_wildcards(f'{indir}/{{acc}}.sig.zip')
 
@@ -51,7 +57,7 @@ rule extract:
 rule fastgather:
     input:
         sig=f'{indir}/{{acc}}.k{{k}}.sig.zip',
-        list=f'{dbdir}/gtdb-reps-rs214-k{{k}}.fullpath.txt'
+        list=f'{dbdir}/fullpath.gtdb-reps-rs214-k{{k}}.txt'
     output:
         csv=touch(f"{outdir}/{{acc}}.k{{k}}.fastgather.csv"),
     conda:
@@ -61,9 +67,11 @@ rule fastgather:
     resources:
         allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
         partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    params:
+        scale = config["scale"],
     shell: """
         # make a directory specific to user and job
-        export MYTMP="/scratch/<USRNAME>/slurm_{rule}.{jobid}"
+        export MYTMP="/scratch/{USER}/slurm_{rule}.{jobid}"
         mkdir -p "$MYTMP"
 
         # force clean it up after job script ends
@@ -77,7 +85,7 @@ rule fastgather:
         # Get prefetch csv
         export RAYON_THREADS={threads}
         sourmash scripts fastgather {homedir}/{input.sig} {homedir}/{input.list} \
-            -o {homedir}/{output.csv} -k {wildcards.k} --scaled 1000
+            -o {homedir}/{output.csv} -k {wildcards.k} --scaled {params.scale}
 
         echo Final file path: {homedir}/{output.csv}
     """

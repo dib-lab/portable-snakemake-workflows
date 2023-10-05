@@ -1,14 +1,23 @@
+# The directory where sketched signatures are kept
 input_dir: sigs
 
+# The directory where the fastgather databases were made
 databases_dir: dbs
 
+# The directory to put the prefetch csv files
 output_dir: gather/prefetch
 
+# This is the file path to the metadata file.
+# In this case, the file is the full metadata
+# output of the SRA Run Selector.
 metadata_file_path: metadata/SraRunTable.txt
 
+# The kmer size within the database (`sourmash sig fileinfo`)
 k_size:
   - 21
   - 31
   - 51
 
-#Include scale variable?
+# The amount to scale representative kmer set
+scale:
+  - 1000

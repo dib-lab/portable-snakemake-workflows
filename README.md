@@ -18,11 +18,47 @@ There is a directory housing the configuration and environment files called by t
 
 ## Sourmash workflows
 
+#### Quickstart:
+To begin, for ssh:
+```
+git clone git@github.com:dib-lab/portable-snakemake-workflows.git
+```
+
+For https:
+```
+git clone https://github.com/dib-lab/portable-snakemake-workflows.git
+```
+
+Consider using the command below immediately after `git clone` to correctly place the dotfiles for `--profile` arugments on an HPC using slurm:
+```
+( cd portable-snakemake-workflows && mkdir -p $HOME/.config/snakemake/slurm && mv dotfiles/config.yaml $HOME/.config/snakemake/slurm && mv dotfiles/slurm-status.py $HOME/.config/snakemake/slurm && cd - )
+```
+
+The following portable workflows will run sequentially.
+
 ### 1. download-sketch
 A set of fast, robust approaches to temporarily downloading sequence files from archives and sketch sourmash signatures.
 
+#### Quickstart:
+If the dotfiles have been properly installed, run:
+```
+snakemake -s download-sketch-cluster --resources allowed_jobs=100 --profile slurm
+```
+
+This will download and sketch the CAMI dataset into the `sigs` directory at scale of 1000 and kmer size of 21, 31, and 51. These values are set in the `download-sketch-config.yaml` and may be changed there at any time. 
+
 ### 2. extract-prefetch
-An efficient approach to temporarily extract the sketches in sourmash signatures that are passed into a prefetch method for `sourmash gather` results via `picklists`.
+An efficient approach to temporarily extract the sketches in sourmash signatures that are passed into the 'preferred' prefetch method. Creating a `picklist` for rapid `sourmash gather` results.
+
+#### Quickstart:
+(While on the Farm HPC) From within the `scripts` directory, run `./fastgather-db-submit-jobs.sh` to create the proper structureed GTDB databases for `fastgather` to run.
+
+If the dotfiles have been properly installed and `download-sketch` has been successfully ran, run:
+```
+snakemake -s extract-prefetch-cluster --resources allowed_jobs=100 --profile slurm
+```
+
+This will temporarily extract all k-sizes and create a `prefetch` csv file of the CAMI sketches in the `gather/prefetch` directory for the scale and k value set in the `extract-prefetch-config.yaml`. 
 
 ### 3. sbt-lca-databases
 **[WIP]** A workflow to take any existing sourmash database and create a Sequence Bloom Tree (SBT) index and Lowest Common Ancestor (LCA) database.

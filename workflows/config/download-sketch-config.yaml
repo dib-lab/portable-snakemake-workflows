@@ -1,7 +1,15 @@
 # This is the file path to the metadata file.
-# In this case, the file is the fulle metadata
+# In this case, the file is the full metadata
 # output of the SRA Run Selector.
 
 metadata_file_path: metadata/SraRunTable.txt
 
-#Include k-size and scale variable?
+# The kmer size within the database (`sourmash sig fileinfo`)
+k_size:
+  - 21
+  - 31
+  - 51
+
+# The amoutn to scale representative kmer set
+scale:
+  - 1000

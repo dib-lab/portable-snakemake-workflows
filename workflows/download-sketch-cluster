@@ -8,7 +8,6 @@
 # Example cli:
 # snakemake -s download-sketch-cluster --resources allowed_jobs=100 --profile slurm
 #
-# Note: Change <USRNAME> on line 71!!!
 ####
 
 import pandas as pd
@@ -21,6 +20,8 @@ configfile: "config/download-sketch-config.yaml"
 metadata = pd.read_csv(config['metadata_file_path'], usecols=['Run'])
 
 SAMPLES = metadata['Run'].tolist()
+
+USER = os.environ.get('USER')
 
 # Dictionary for dynamic slurm batch allocations with correct resources
 PART_JOBS = {1: ['low2', 1], 2: ['low2', 1], 3: ['med2', 33], 4: ['med2', 33], 5: ['high2', 10000]}
@@ -66,9 +67,12 @@ rule dump_and_sketch:
         "sigs/{sample}.sig.zip",
     conda:
         "envs/download-sketch-env.yaml"
+    params:
+        k_list = lambda wildcards: ",".join([f"k={k}" for k in config["k_size"]]),
+        scale = config["scale"],
     shell:"""
         # make a directory specific to user and job
-        export MYTMP="/scratch/<USRNAME>/slurm_{rule}.{jobid}"
+        export MYTMP="/scratch/{USER}/slurm_{rule}.{jobid}"
         mkdir -p "$MYTMP"
 
         # force clean it up after job script ends
@@ -79,5 +83,5 @@ rule dump_and_sketch:
         fasterq-dump --stdout --skip-technical --fasta-unsorted\
         --threads {threads} --bufsize 1000MB --curcache 10000MB --mem {resources.mem_mb} \
         {input.sra_file} | \
-        sourmash sketch dna -p scaled=1000,k=21,k=31,k=51,abund - -o {output}
+        sourmash sketch dna -p scaled={params.scale},{params.k_list},abund - -o {output}
     """
