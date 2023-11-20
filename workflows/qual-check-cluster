@@ -1,0 +1,57 @@
+# A snakemake workflow to check the quality of your sequence data and the sourmash signature generated!
+
+import pandas as pd
+
+configfile: "config/download-sketch-config.yaml"
+
+metadata = pd.read_csv(config['metadata_file_path'], usecols=['Run', 'BioProject'])
+
+DICT = metadata.to_dict(orient='index')
+
+project_run ={each['BioProject']: {each['Run']} for each in DICT.values()}
+
+for each in DICT.values():
+    project = each['BioProject']
+    run = each['Run']
+    project_run[project] |= {run}
+
+fastqc_input = [
+    expand(
+        f"qc/fastqc/{project}/{accession}_fastqc.html"
+        )
+    for project, sample_list in project_run.items() for accession in sample_list ]
+
+sra_input = [
+    expand(
+        f"qc/sra/{project}/{accession}.sra"
+        )
+    for project, sample_list in project_run.items() for accession in sample_list ]
+
+
+
+multiqc_input = [ expand(f"qc/fastqc/{project}/{accession}_{{num}}_fastqc", num=[1,2]) for project, sample_list in project_run.items() for accession in sample_list ]
+
+remove_file = [ expand(f"qc/sra/{project}/{accession}.sra", num=[1,2]) for project, sample_list in project_run.items() for accession in sample_list ]
+
+projectlist=list({project for project, sample_list in project_run.items()})
+
+acclist=list({accession for project, sample_list in project_run.items() for accession in sample_list})
+#print(acclist)
+
+#prowild, = glob_wildcards(projectlist)
+#print(prowild)
+#accwild, = glob_wildcards(acclist)
+#print(accwild)
+
+#ACC = metadata['Run'].tolist()
+#ACC=ACC[:5]
+
+#print(ACC)
+
+PART_JOBS = {1: ['low2', 1], 2: ['low2', 1], 3: ['med2', 33], 4: ['med2', 33], 5: ['high2', 10000]}
+
+
+rule all:
+    input:
+        #sra_input,
+        fastqc_input,
