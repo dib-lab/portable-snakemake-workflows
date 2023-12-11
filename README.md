@@ -1,3 +1,15 @@
+# Why?
+
+For you thinking "Why did you make this repo?", this repo is a collection of short snakemake workflows that may fulfill a single portion of a larger workflow. The idea is to have a set of easily run workflows that build off each others output.
+
+For you thinking "Still, why?", this will allow for multiple positive outcomes with only minor inconvenience.
+1. Smaller workflows equal smaller DAGs.
+  - For those of us who have hit 20,000+ DAGs regularly, the workflow do not always run and can take a significant time to begin. The shorter workflow of only a few step bypasses this limitation. Simply run one workflow after the next until the grand workflow is complete.
+3. Smaller workflows are easier to debug.
+  - Perhaps this is a personal issue but I like debugging the shorter workflows. The longer workflows break at rule 1 then rule 5 then at rule ... You get the idea. Here the workflows are individualized, this allows the user to narrow in on the broken part immediately. Debugging will also be easier with a modular approach. As long as all the benchmarking files already exist for the first rule in each modular workflow, the entire grand workflow may be run to completion with only the buggy workflows breaking.
+4. Smaller workflows may be built upon as a seed template.
+  - Well, the idea here is that you like longer workflows and want to take the workflows from this repo as a beginning. A starting point on your adventure into workflow writing. Cool, do your do, you do you. 
+
 # dotfiles
 
 Configuration files for running snakemake with the `--profile` argument. This allows dynamic workflows to utilizing HPC resources in a holistic way. 
