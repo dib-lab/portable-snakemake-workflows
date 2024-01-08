@@ -35,12 +35,12 @@ configfile: "config/sgc-prep-config.yml"
 
 # set working and output directory because the cluster
 #workdir: config['workdir']
-outdir = config.get('outdir')
+#outdir = config.get('outdir')
 
 # Create a list of runs for each project
 metadata = pd.read_csv(config['metadata_file_path'], usecols=['Run'])
 
-SAMPLES = metadata['Run'].tolist()[:5]
+SAMPLES = metadata['Run'].tolist()
 print(SAMPLES)
 
 ACC = config['query_genomes']
@@ -110,12 +110,12 @@ rule dump:
         partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
     params:
         do_not_run_me = 1 if config.get("prevent_sra_download", False) else 0,
-        outdir = outdir,
+        #outdir = outdir,
     shell: '''
         if [ "{params.do_not_run_me}" = 1 ]; then
             echo "** You are trying to download from SRA for sample {wildcards.sample},"
             echo "** but 'prevent_sra_download' is set to true in config."
-            echo "** Does '{params.outdir}/trim/{wildcards.sample}.trim.fq.gz' exist?"
+            echo "** Does 'trim/{wildcards.sample}.trim.fq.gz' exist?"
             exit -1
         fi
 
