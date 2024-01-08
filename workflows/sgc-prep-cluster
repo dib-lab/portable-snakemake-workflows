@@ -1,0 +1,383 @@
+####
+# This snakefile was created to download,
+# sketch, and remove unnecessary files
+# within a HPC environment and the slurm
+# scheduler. View dotfiles for more
+# information.
+#
+# Example cli:
+# snakemake -s sgc-prep-cluster --resources allowed_jobs=100 --profile slurm
+#
+# 1. sra file
+# 2. fastq file/s
+# 3. fastp adtaper trimming
+# 4. host contamination trimming (sourmash containment?)
+# 5. query contamination cleaning (charcoal)
+# 6. khmer low abund trimming
+# 7. sgc config files
+# 8. sgc build extract_reads extract_contigs
+#
+# config file needs to:
+# set working directory in group scratch 
+# set the final output directory
+# define the radius and k-size
+# define query genome/s
+# 
+# charcoal specific config file
+#
+####
+
+import pandas as pd
+
+from os.path import exists
+
+configfile: "config/sgc-prep-config.yml"
+
+# set working and output directory because the cluster
+#workdir: config['workdir']
+outdir = config.get('outdir')
+
+# Create a list of runs for each project
+metadata = pd.read_csv(config['metadata_file_path'], usecols=['Run'])
+
+SAMPLES = metadata['Run'].tolist()[:5]
+print(SAMPLES)
+
+ACC = config['query_genomes']
+print(ACC)
+
+wildcard_constraints:
+    #size="\d+",
+    sample='[^./_]+' 
+
+USER = os.environ.get('USER')
+
+# Dictionary for dynamic slurm batch allocations with correct resources
+PART_JOBS = {1: ['low2', 1], 2: ['low2', 1], 3: ['med2', 33], 4: ['med2', 33], 5: ['high2', 10000]}
+
+rule all:
+    input:
+#         expand("trim/{sample}.nohost.fq.gz", sample=SAMPLES),
+#         expand("trim/{sample}.human.fq.gz", sample=SAMPLES),
+#         expand('trim/{sample}_unpaired.nohost.fq.gz', sample=SAMPLES),
+#         expand('trim/{sample}_unpaired.human.fq.gz', sample=SAMPLES),
+        expand("trim/{sample}_{k}.abundtrim.fq.gz", sample=SAMPLES, k=config['k_size']),
+        expand("genomes/{acc}_genomic.fna.gz", acc=ACC),
+        expand("sgc/{sample}_k{k}_r{r}.conf", sample=SAMPLES, k=config['k_size'], r=config['query_radius']),
+#        expand("sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz", sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
+#        expand("sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig", sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
+        expand("sgc{r}/{sample}_k{k}_r{r}/catlas.csv",sample=SAMPLES, k=config['k_size'], r=config['query_radius']),
+        expand("sgc{r}/{sample}_k{k}/cdbg.gxt",sample=SAMPLES, k=config['k_size'], r=config['query_radius']),
+
+# Subset the DAG by existing sig files
+if not exists("raw/{wildcards.sample}_1.fastq.gz"):
+    rule download_sra:
+        output:
+            temp("sra/{sample}.sra"),
+        threads:
+            10
+        resources:
+            mem_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
+            time = lambda wildcards, attempt: 4 * 60 * attempt,
+            runtime = lambda wildcards, attempt: 4 * 60 * attempt,
+            allowed_jobs=25, # Allow only four jobs at a time
+            partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+        conda:
+            "envs/fetch.yml"
+        shell:
+           """
+               aws s3 cp --quiet --no-sign-request \
+               s3://sra-pub-run-odp/sra/{wildcards.sample}/{wildcards.sample} \
+               {output} \
+               || prefetch --quiet {wildcards.sample} -o {output}
+           """
+
+rule dump:
+    input:
+        sra_file = "sra/{sample}.sra"
+    output:
+        r1  = protected("raw/{sample}_1.fastq.gz"),
+        r2  = protected("raw/{sample}_2.fastq.gz"),
+        unp = protected("raw/{sample}_unpaired.fastq.gz"),
+    threads: 16
+    conda:
+        "envs/fetch.yml"
+    resources:
+        mem_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    params:
+        do_not_run_me = 1 if config.get("prevent_sra_download", False) else 0,
+        outdir = outdir,
+    shell: '''
+        if [ "{params.do_not_run_me}" = 1 ]; then
+            echo "** You are trying to download from SRA for sample {wildcards.sample},"
+            echo "** but 'prevent_sra_download' is set to true in config."
+            echo "** Does '{params.outdir}/trim/{wildcards.sample}.trim.fq.gz' exist?"
+            exit -1
+        fi
+
+        # make a directory specific to user, rule, and job
+        export TMP="/scratch/{USER}/slurm_{rule}.{jobid}"
+        mkdir -p "$TMP"
+
+        echo tmp directory: "$TMP"
+
+        # force clean up after job script ends
+        function cleanup()(rm -rf "$TMP")
+        trap cleanup EXIT
+
+        # Get fastqc file
+        echo running fasterq-dump for {wildcards.sample}
+        
+        fasterq-dump {input.sra_file} -O "$TMP" -t "$TMP" \
+        --threads {threads} --bufsize 1000MB --curcache 10000MB --mem {resources.mem_mb} \
+        -p 
+        
+        ls -h "$TMP"
+ 
+        # make unpaired file if needed
+        if [ -f "$TMP"/{wildcards.sample}_1.fastq -a -f "$TMP"/{wildcards.sample}_2.fastq -a \! -f "$TMP"/{wildcards.sample}.fastq ];
+          then
+            echo "no unpaired; creating empty unpaired file {wildcards.sample}.fastq for simplicity"
+            touch "$TMP"/{wildcards.sample}.fastq
+          # make r1, r2 files if needed
+        elif [ -f "$TMP"/{wildcards.sample}.fastq -a \! -f "$TMP"/{wildcards.sample}_1.fastq -a \! -f "$TMP"/{wildcards.sample}_2.fastq ];
+          then
+            echo "unpaired file found; creating empty r1 ({wildcards.sample}_1.fastq) and r2 ({wildcards.sample}_2.fastq) files for simplicity"
+            touch "$TMP"/{wildcards.sample}_1.fastq
+            touch "$TMP"/{wildcards.sample}_2.fastq
+        fi
+
+        # now process the files and move to a permanent location
+        echo processing R1...
+        seqtk seq -C "$TMP"/{wildcards.sample}_1.fastq | \
+            perl -ne 's/\.([12])$/\/$1/; print $_' | \
+            gzip -c > {output.r1} &
+
+        echo processing R2...
+        seqtk seq -C "$TMP"/{wildcards.sample}_2.fastq | \
+            perl -ne 's/\.([12])$/\/$1/; print $_' | \
+            gzip -c > {output.r2} &
+
+        echo processing unpaired...
+        seqtk seq -C "$TMP"/{wildcards.sample}.fastq | \
+            perl -ne 's/\.([12])$/\/$1/; print $_' | \
+            gzip -c > {output.unp} &
+        wait
+        echo finished downloading raw reads
+        '''
+
+# adapter trimming
+rule trim_adapters_wc:
+    input:
+        r1 = ancient("raw/{sample}_1.fastq.gz"),
+        r2 = ancient("raw/{sample}_2.fastq.gz"),
+    output:
+        r1 = protected('trim/{sample}_1.trim.fq.gz'),
+        r2 = protected('trim/{sample}_2.trim.fq.gz'),
+        json = "trim/{sample}.trim.json",
+        html = "trim/{sample}.trim.html",
+    conda: 'envs/trim.yml'
+    threads: 4
+    resources:
+        mem_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    shadow: "shallow"
+    shell: """
+        fastp --in1 {input.r1} --in2 {input.r2} \
+             --out1 {output.r1} --out2 {output.r2} \
+             --detect_adapter_for_pe  --qualified_quality_phred 4 \
+             --length_required 31 --correction --thread {threads} \
+             --json {output.json} --html {output.html} \
+             --low_complexity_filter
+    """
+
+# adapter trimming for the singleton reads
+rule trim_unpaired_adapters_wc:
+    input:
+        unp = ancient("raw/{sample}_unpaired.fastq.gz"),
+    output:
+        unp = protected('trim/{sample}_unpaired.trim.fq.gz'),
+        json = protected('trim/{sample}_unpaired.trim.json'),
+        html = protected('trim/{sample}_unpaired.trim.html'),
+    threads: 4
+    resources:
+        mem_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    shadow: "shallow"
+    conda: 'envs/trim.yml'
+    shell: """
+        fastp --in1 {input.unp}  \
+            --qualified_quality_phred 4 --length_required 31 \
+            --correction --thread {threads} \
+            --json {output.json} --html {output.html} \
+            --low_complexity_filter --stdout | gzip -9 > {output.unp} 
+    """
+
+rule get_mask:
+    output:
+        human='trim/hg19_main_mask_ribo_animal_allplant_allfungus.fa.gz'
+    conda: 'envs/trim.yml'
+    shell:"""
+        
+        gdown --id 0B3llHR93L14wd0pSSnFULUlhcUk --output trim/hg19_main_mask_ribo_animal_allplant_allfungus.fa.gz
+        
+    """        
+
+rule remove_host:
+# http://seqanswers.com/forums/archive/index.php/t-42552.html
+# https://drive.google.com/file/d/0B3llHR93L14wd0pSSnFULUlhcUk/edit?usp=sharing
+    input: 
+        r1 = "trim/{sample}_1.trim.fq.gz",
+        r2 = "trim/{sample}_2.trim.fq.gz",
+        human = 'trim/hg19_main_mask_ribo_animal_allplant_allfungus.fa.gz'
+    output:
+        nohost1 = 'trim/{sample}_1.nohost.fq.gz',
+        nohost2 = 'trim/{sample}_2.nohost.fq.gz',
+        human1 = 'trim/{sample}_1.human.fq.gz',
+        human2 = 'trim/{sample}_2.human.fq.gz',
+    threads: 16
+    conda: 'envs/trim.yml'
+    resources:
+        mem_mb = lambda wildcards, attempt: 16 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    shell:'''
+        bbduk.sh -Xmx64g t={threads} in={input.r1} in2={input.r2} \
+                 out={output.nohost1} out2={output.nohost2} \
+                 outm={output.human1} outm2={output.human2} k=31 ref={input.human}
+    '''
+
+rule remove_unpaired_host:
+# http://seqanswers.com/forums/archive/index.php/t-42552.html
+# https://drive.google.com/file/d/0B3llHR93L14wd0pSSnFULUlhcUk/edit?usp=sharing
+    input: 
+        unpair="trim/{sample}_unpaired.trim.fq.gz",
+        human='trim/hg19_main_mask_ribo_animal_allplant_allfungus.fa.gz'
+    output:
+        nohost='trim/{sample}_unpaired.nohost.fq.gz',
+        human='trim/{sample}_unpaired.human.fq.gz',
+    threads: 16
+    conda: 'envs/trim.yml'
+    resources:
+        mem_mb = lambda wildcards, attempt: 16 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    shell:'''
+        bbduk.sh -Xmx64g t={threads} in={input.unpair} \
+                 out={output.nohost} outm={output.human} k=31 ref={input.human}
+    '''
+
+rule interleaving:
+    input:
+        trim1 = ancient('trim/{sample}_1.trim.fq.gz'),
+        trim2 = ancient('trim/{sample}_2.trim.fq.gz'),
+        nohost1= ancient('trim/{sample}_1.nohost.fq.gz'),
+        nohost2 = ancient('trim/{sample}_2.nohost.fq.gz'),
+    output:
+        trim = protected("trim/{sample}.trim.fq.gz"),
+        nohost = protected("trim/{sample}.nohost.fq.gz"),
+    conda: 'envs/trim.yml'
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    shell: """
+        interleave-reads.py {input.trim1} {input.trim2} -o {output.trim}
+        interleave-reads.py {input.nohost1} {input.nohost2} -o {output.nohost}
+    """
+
+rule kmer_trim:
+    input: 
+        trim = ancient('trim/{sample}.trim.fq.gz'),
+        nohost = ancient('trim/{sample}.nohost.fq.gz'),
+    output:
+        abundtrim = protected("trim/{sample}_{k}.abundtrim.fq.gz")
+    conda: 'envs/trim.yml'
+    resources:
+        mem_mb = lambda wildcards, attempt: 20 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    shell: """
+        trim-low-abund.py -C 3 -Z 18 -M {resources.mem_mb}e6 -V -k {wildcards.k} -o {output.abundtrim} --gzip {input.trim}
+    """
+# -M is in bytes?
+
+rule get_queries:
+    output:
+        queries='genomes/{acc}_genomic.fna.gz'
+    resources:
+        mem_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    shell:"""
+        curl -o {output.queries} "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{wildcards.acc}/download?include_annotation_type=GENOME_FASTA"
+    """        
+
+# create a spacegraphcats config file
+rule create_sgc_conf:
+    input:
+        #csv = "gather/{sample}.gather.csv.gz",
+        queries = expand("genomes/{acc}_genomic.fna.gz", acc = ACC)
+    output:
+        conf = "sgc/{sample}_k{k}_r{r}.conf"
+    resources:
+        mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    run:
+        query_list = "\n- ".join(input.queries)
+        with open(output.conf, 'wt') as fp:
+           print(f"""\
+catlas_base: {wildcards.sample}
+input_sequences:
+- trim/{wildcards.sample}_{wildcards.k}.abundtrim.fq.gz
+ksize: {wildcards.k}
+radius: {wildcards.r}
+search:
+- {query_list}
+""", file=fp)
+
+rule sgc_build_extract:
+    input:
+        #query = "genome/{acc}_genomic.fna.gz",
+        conf = "sgc/{sample}_k{k}_r{r}.conf",
+        #reads = "trim/{sample}_{k}.abundtrim.fq.gz",
+    output:
+        #"sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz",
+        #"sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig",
+        "sgc{r}/{sample}_k{k}_r{r}/catlas.csv",
+        "sgc{r}/{sample}_k{k}/cdbg.gxt",
+    conda: "envs/spacegraphcats.yml"
+    resources:
+        mem_mb = lambda wildcards, attempt: 20 * 1024 * attempt,
+        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    threads: 1
+    params: outdir = lambda wildcards: "sgc_build" #+ wildcards.r
+    shell:"""
+        python -m spacegraphcats build {input.conf} --outdir={params.outdir} --nolock --rerun-incomplete 
+    """ 

@@ -1,0 +1,31 @@
+# This is the file path to the metadata file.
+# In this case, the file is the full metadata
+# output of the SRA Run Selector.
+
+metadata_file_path: metadata/SraRunTable.txt
+
+# Directories
+workdir: ~/dissertation-project/seqs
+
+outdir: dissertation-project/seqs
+
+prevent_sra_download: False
+
+# The kmer size within the database (`sourmash sig fileinfo`)
+k_size:
+  - 21
+  - 31
+#  - 51 is too large for khmer abundtrimming
+
+# Query genomes for spacegraphcats
+query_genomes:
+  - GCA_000349525.1
+
+query_radius:
+  - 1
+  - 5
+  - 10
+
+# The amount to scale representative kmer set
+scale:
+  - 1000

@@ -1,0 +1,11 @@
+channels:
+  - conda-forge
+  - bioconda
+  - defaults
+dependencies:
+  - python
+  - bioconda::sra-tools
+  - awscli
+  - ca-certificates
+  - openssl
+  - seqtk
