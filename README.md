@@ -1,12 +1,18 @@
 # Why?
 
-For you thinking "Why did you make this repo?", this repo is a collection of short snakemake workflows that may fulfill a single portion of a larger workflow. The idea is to have a set of easily run workflows that build off each others output.
+For those thinking "Why did you make this repo?", this is a collection of 'short' snakemake workflows that may fulfill a single portion of a larger workflow. The idea is to have a set of easily run workflows that build off each others output. 
 
 For you thinking "Still, why?", this will allow for multiple positive outcomes with only minor inconvenience.
 1. Smaller workflows equal smaller DAGs.
   - For those of us who have hit 20,000+ DAGs regularly, the workflow do not always run and can take a significant time to begin. The shorter workflow of only a few step bypasses this limitation. Simply run one workflow after the next until the grand workflow is complete.
+2. Focusing the workflows on individual tasks (i.e. quickly make sourmash signature or a spacegraphcats catlas), I aim to fight bloated workflows as much as possible.
+  - Ideally, each workflow will fall into one of four categories:
+    1. ***Acquire*** raw data
+    2. ***Process*** to refine data
+    3. ***Acquire*** necessary results
+    4. ***Report*** results in standard format 
 3. Smaller workflows are easier to debug.
-  - Perhaps this is a personal issue but I like debugging the shorter workflows. The longer workflows break at rule 1 then rule 5 then at rule ... You get the idea. Here the workflows are individualized, this allows the user to narrow in on the broken part immediately. Debugging will also be easier with a modular approach. As long as all the benchmarking files already exist for the first rule in each modular workflow, the entire grand workflow may be run to completion with only the buggy workflows breaking.
+  - Perhaps this is a personal issue, but I like debugging the shorter workflows. The longer workflows break at rule 1 then rule 5 then at rule ... You get the idea. Here the workflows are individualized, this allows the user to narrow in on the broken part immediately. Debugging will also be easier with a modular approach. As long as all the input files exist for the first rule in each modular workflow, the entire grand workflow may be run to completion with only the buggy workflows breaking.
 4. Smaller workflows may be built upon as a seed template.
   - Well, the idea here is that you like longer workflows and want to take the workflows from this repo as a beginning. A starting point on your adventure into workflow writing. Cool, do your do, you do you. 
 
@@ -17,6 +23,8 @@ Configuration files for running snakemake with the `--profile` argument. This al
 ## config.yaml
 
 This is the configuration of the `--profile`. It contains default allocations for both `sbatch` and `snakemake`.
+
+**Note: This dotfile configuration breaks with snakemake version 8. Use snakemake version 7.32.4 until further notice.**
 
 ## slurm-status.py
 
