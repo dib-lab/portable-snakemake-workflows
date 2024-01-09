@@ -40,7 +40,7 @@ configfile: "config/sgc-prep-config.yml"
 # Create a list of runs for each project
 metadata = pd.read_csv(config['metadata_file_path'], usecols=['Run'])
 
-SAMPLES = metadata['Run'].tolist()
+SAMPLES = metadata['Run'].tolist()[:5]
 print(SAMPLES)
 
 ACC = config['query_genomes']
@@ -66,8 +66,10 @@ rule all:
         expand("sgc/{sample}_k{k}_r{r}.conf", sample=SAMPLES, k=config['k_size'], r=config['query_radius']),
 #        expand("sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz", sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
 #        expand("sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig", sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
-        expand("sgc{r}/{sample}_k{k}_r{r}/catlas.csv",sample=SAMPLES, k=config['k_size'], r=config['query_radius']),
-        expand("sgc{r}/{sample}_k{k}/cdbg.gxt",sample=SAMPLES, k=config['k_size'], r=config['query_radius']),
+        expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}/catlas.csv",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
+        expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}/cdbg.gxt",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
+        expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
+        expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
 
 # Subset the DAG by existing sig files
 if not exists("raw/{wildcards.sample}_1.fastq.gz"):
@@ -354,30 +356,32 @@ catlas_base: {wildcards.sample}
 input_sequences:
 - trim/{wildcards.sample}_{wildcards.k}.abundtrim.fq.gz
 ksize: {wildcards.k}
-radius: {wildcards.r}
+radius: {wildcards.r}b
 search:
 - {query_list}
 """, file=fp)
 
 rule sgc_build_extract:
     input:
-        #query = "genome/{acc}_genomic.fna.gz",
+        query = "genomes/{acc}_genomic.fna.gz",
         conf = "sgc/{sample}_k{k}_r{r}.conf",
         #reads = "trim/{sample}_{k}.abundtrim.fq.gz",
     output:
-        #"sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz",
-        #"sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig",
-        "sgc{r}/{sample}_k{k}_r{r}/catlas.csv",
-        "sgc{r}/{sample}_k{k}/cdbg.gxt",
+        "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz",
+        "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig",
+        "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}/catlas.csv",
+        "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}/cdbg.gxt",
     conda: "envs/spacegraphcats.yml"
     resources:
-        mem_mb = lambda wildcards, attempt: 20 * 1024 * attempt,
+        mem_mb = lambda wildcards, attempt: 100 * 1024 * attempt,
         time = lambda wildcards, attempt: 1.5 * 60 * attempt,
         runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
-        allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
+        allowed_jobs=100, #lambda wildcards, attempt: PART_JOBS[attempt][1],
         partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
-    threads: 1
-    params: outdir = lambda wildcards: "sgc_build" #+ wildcards.r
+    threads: 64
+    params: 
+        outdir = lambda wildcards: "sgc_" + wildcards.acc + ".x." + wildcards.sample + "_k" + wildcards.k + "_r" + wildcards.r,
     shell:"""
-        python -m spacegraphcats build {input.conf} --outdir={params.outdir} --nolock --rerun-incomplete 
+        python -m spacegraphcats run {input.conf} extract_reads extract_contigs --outdir={params.outdir} --nolock --rerun-incomplete 
+        python -m spacegraphcats run {input.conf} build --outdir={params.outdir} --nolock --rerun-incomplete 
     """ 
