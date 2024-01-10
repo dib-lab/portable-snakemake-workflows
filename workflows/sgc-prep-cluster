@@ -46,14 +46,14 @@ print(SAMPLES)
 ACC = config['query_genomes']
 print(ACC)
 
-wildcard_constraints:
-    #size="\d+",
-    sample='[^./_]+' 
-
 USER = os.environ.get('USER')
 
 # Dictionary for dynamic slurm batch allocations with correct resources
 PART_JOBS = {1: ['low2', 1], 2: ['low2', 1], 3: ['med2', 33], 4: ['med2', 33], 5: ['high2', 10000]}
+
+wildcard_constraints:
+    sample='[^./_]+', 
+    r='[0-9]+',
 
 rule all:
     input:
@@ -68,8 +68,8 @@ rule all:
 #        expand("sgc/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig", sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
         expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}/catlas.csv",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
         expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}/cdbg.gxt",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
-        expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
-        expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
+#        expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
+#        expand("sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig",sample=SAMPLES, k=config['k_size'], r=config['query_radius'], acc=ACC),
 
 # Subset the DAG by existing sig files
 if not exists("raw/{wildcards.sample}_1.fastq.gz"):
@@ -98,9 +98,9 @@ rule dump:
     input:
         sra_file = "sra/{sample}.sra"
     output:
-        r1  = protected("raw/{sample}_1.fastq.gz"),
-        r2  = protected("raw/{sample}_2.fastq.gz"),
-        unp = protected("raw/{sample}_unpaired.fastq.gz"),
+        r1  = "raw/{sample}_1.fastq.gz",
+        r2  = "raw/{sample}_2.fastq.gz",
+        unp = "raw/{sample}_unpaired.fastq.gz",
     threads: 16
     conda:
         "envs/fetch.yml"
@@ -178,8 +178,8 @@ rule trim_adapters_wc:
         r1 = ancient("raw/{sample}_1.fastq.gz"),
         r2 = ancient("raw/{sample}_2.fastq.gz"),
     output:
-        r1 = protected('trim/{sample}_1.trim.fq.gz'),
-        r2 = protected('trim/{sample}_2.trim.fq.gz'),
+        r1 = 'trim/{sample}_1.trim.fq.gz',
+        r2 = 'trim/{sample}_2.trim.fq.gz',
         json = "trim/{sample}.trim.json",
         html = "trim/{sample}.trim.html",
     conda: 'envs/trim.yml'
@@ -205,9 +205,9 @@ rule trim_unpaired_adapters_wc:
     input:
         unp = ancient("raw/{sample}_unpaired.fastq.gz"),
     output:
-        unp = protected('trim/{sample}_unpaired.trim.fq.gz'),
-        json = protected('trim/{sample}_unpaired.trim.json'),
-        html = protected('trim/{sample}_unpaired.trim.html'),
+        unp = 'trim/{sample}_unpaired.trim.fq.gz',
+        json = 'trim/{sample}_unpaired.trim.json',
+        html = 'trim/{sample}_unpaired.trim.html',
     threads: 4
     resources:
         mem_mb = lambda wildcards, attempt: 8 * 1024 * attempt,
@@ -290,8 +290,8 @@ rule interleaving:
         nohost1= ancient('trim/{sample}_1.nohost.fq.gz'),
         nohost2 = ancient('trim/{sample}_2.nohost.fq.gz'),
     output:
-        trim = protected("trim/{sample}.trim.fq.gz"),
-        nohost = protected("trim/{sample}.nohost.fq.gz"),
+        trim = "trim/{sample}.trim.fq.gz",
+        nohost = "trim/{sample}.nohost.fq.gz",
     conda: 'envs/trim.yml'
     resources:
         mem_mb = lambda wildcards, attempt: 1 * 1024 * attempt,
@@ -309,7 +309,7 @@ rule kmer_trim:
         trim = ancient('trim/{sample}.trim.fq.gz'),
         nohost = ancient('trim/{sample}.nohost.fq.gz'),
     output:
-        abundtrim = protected("trim/{sample}_{k}.abundtrim.fq.gz")
+        abundtrim = "trim/{sample}_{k}.abundtrim.fq.gz"
     conda: 'envs/trim.yml'
     resources:
         mem_mb = lambda wildcards, attempt: 20 * 1024 * attempt,
@@ -331,8 +331,16 @@ rule get_queries:
         runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
         allowed_jobs=lambda wildcards, attempt: PART_JOBS[attempt][1],
         partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+    conda: 'envs/fetch.yml'
     shell:"""
-        curl -o {output.queries} "https://api.ncbi.nlm.nih.gov/datasets/v2alpha/genome/accession/{wildcards.acc}/download?include_annotation_type=GENOME_FASTA"
+        datasets download genome accession {wildcards.acc} --dehydrated --filename genomes/{wildcards.acc}_dataset.zip --include genome --no-progressbar
+        
+        unzip -o genomes/{wildcards.acc}_dataset.zip -d genomes/{wildcards.acc}_dataset
+
+        datasets rehydrate --directory genomes/{wildcards.acc}_dataset --gzip
+
+        cp genomes/{wildcards.acc}_dataset/ncbi_dataset/data/{wildcards.acc}/{wildcards.acc}*_genomic.fna.gz {output.queries}
+        
     """        
 
 # create a spacegraphcats config file
@@ -356,19 +364,42 @@ catlas_base: {wildcards.sample}
 input_sequences:
 - trim/{wildcards.sample}_{wildcards.k}.abundtrim.fq.gz
 ksize: {wildcards.k}
-radius: {wildcards.r}b
+radius: {wildcards.r}
 search:
 - {query_list}
 """, file=fp)
 
-rule sgc_build_extract:
+#rule sgc_extract:
+#    input:
+#        query = "genomes/{acc}_genomic.fna.gz",
+#        conf = "sgc/{sample}_k{k}_r{r}.conf",
+#        #reads = "trim/{sample}_{k}.abundtrim.fq.gz",
+#    output:
+#        "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz",
+#        "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig",
+#    conda: "envs/spacegraphcats.yml"
+#    resources:
+#        mem_mb = lambda wildcards, attempt: 100 * 1024 * attempt,
+#        time = lambda wildcards, attempt: 1.5 * 60 * attempt,
+#        runtime = lambda wildcards, attempt: 1.5 * 60 * attempt,
+#        allowed_jobs=100, #lambda wildcards, attempt: PART_JOBS[attempt][1],
+#        partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
+#    threads: 64
+#    params: 
+#        outdir = lambda wildcards: "sgc/sgc_" + wildcards.acc + ".x." + wildcards.sample + "_k" + wildcards.k + "_r" + wildcards.r,
+#    shell:"""
+#        #if [ -f "sgc/sgc_{wildcards.acc}.x.{wildcards.sample}_k{wildcards.k}_r{wildcards.r}/{wildcards.sample}_k{wildcards.k}/bcalm.unitigs.db" ]; then
+#        #    rm sgc/sgc_{wildcards.acc}.x.{wildcards.sample}_k{wildcards.k}_r{wildcards.r}/{wildcards.sample}_k{wildcards.k}/bcalm.unitigs.db
+#        #fi
+#        python -m spacegraphcats run {input.conf} extract_reads extract_contigs --outdir={params.outdir} --nolock --rerun-incomplete --cores {threads}
+#    """
+
+rule sgc_build:
     input:
         query = "genomes/{acc}_genomic.fna.gz",
         conf = "sgc/{sample}_k{k}_r{r}.conf",
         #reads = "trim/{sample}_{k}.abundtrim.fq.gz",
     output:
-        "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.cdbg_ids.read.gz",
-        "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}_search_oh0/{acc}.fna.gz.contigs.sig",
         "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}_r{r}/catlas.csv",
         "sgc/sgc_{acc}.x.{sample}_k{k}_r{r}/{sample}_k{k}/cdbg.gxt",
     conda: "envs/spacegraphcats.yml"
@@ -380,8 +411,7 @@ rule sgc_build_extract:
         partition=lambda wildcards, attempt: PART_JOBS[attempt][0],
     threads: 64
     params: 
-        outdir = lambda wildcards: "sgc_" + wildcards.acc + ".x." + wildcards.sample + "_k" + wildcards.k + "_r" + wildcards.r,
+        outdir = lambda wildcards: "sgc/sgc_" + wildcards.acc + ".x." + wildcards.sample + "_k" + wildcards.k + "_r" + wildcards.r,
     shell:"""
-        python -m spacegraphcats run {input.conf} extract_reads extract_contigs --outdir={params.outdir} --nolock --rerun-incomplete 
-        python -m spacegraphcats run {input.conf} build --outdir={params.outdir} --nolock --rerun-incomplete 
+        python -m spacegraphcats run {input.conf} build --outdir={params.outdir} --nolock --rerun-incomplete --cores {threads}
     """ 
